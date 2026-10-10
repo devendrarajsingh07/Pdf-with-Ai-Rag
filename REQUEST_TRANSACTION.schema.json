@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Owner-visible request job status and audit",
+  "description": "Returned by authenticated GET /api/v1/jobs/:id. Raw idempotency keys, prompts, PDFs and credentials are never audit fields. Encrypted results are decrypted only for the owner.",
+  "type": "object",
+  "required": ["id", "userId", "kind", "resourceId", "status", "idempotencyKeyHash", "attempts", "events", "scheduling"],
+  "properties": {
+    "id": { "type": "string", "format": "uuid" },
+    "userId": { "type": "string", "format": "uuid" },
+    "kind": { "enum": ["chat", "document", "reindex"] },
+    "resourceId": { "type": "string", "format": "uuid" },
+    "status": { "enum": ["queued", "processing", "completed", "failed"] },
+    "idempotencyKeyHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "attempts": { "type": "integer", "minimum": 0, "maximum": 3 },
+    "priority": { "type": "integer", "minimum": 0 },
+    "estimatedMs": { "type": "integer", "minimum": 1, "maximum": 600000 },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" },
+    "scheduling": { "const": "priority-and-non-preemptive-estimated-SJF-with-aging" },
+    "errorCode": { "type": ["string", "null"] },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["stage", "at"],
+        "properties": {
+          "stage": { "enum": ["queued", "processing", "committed", "failed"] },
+          "at": { "type": "string", "format": "date-time" },
+          "attempt": { "type": "integer" },
+          "code": { "type": "string" },
+          "requestId": { "type": "string", "format": "uuid" },
+          "idempotencyKeyHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "result": {
+      "description": "Decrypted committed response for this authenticated owner, or null before completion. Chat result contains userMessage and assistantMessage; document result contains documentId and status.",
+      "type": ["object", "null"]
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,6 @@
+# Optional modern OCR stack. Install alongside requirements.txt.
+# Keep OpenCV compatible with the base NumPy 1.26 pin.
+python-doctr==1.1.0
+opencv-python==4.10.0.84
+torch==2.14.1
+torchvision==0.29.1

@@ -1,0 +1,125 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD}
+    command: ["sh", "-c", 'exec redis-server --appendonly yes --appendfsync everysec --requirepass "$${REDIS_PASSWORD}" --maxmemory 256mb --maxmemory-policy noeviction']
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", 'REDISCLI_AUTH="$${REDIS_PASSWORD}" redis-cli ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgres-test:
+    image: postgres:16
+    profiles: ["test"]
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_TEST_DB}
+      POSTGRES_USER: ${POSTGRES_TEST_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_TEST_PASSWORD}
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  qdrant:
+    image: qdrant/qdrant:v1.19.1
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6333:6333"
+      - "127.0.0.1:6334:6334"
+    volumes:
+      - qdrant_storage:/qdrant/storage
+
+  ml-service:
+    build:
+      context: ./ml-service
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      qdrant:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    env_file:
+      - ml-service/.env
+    environment:
+      - QDRANT_URL=http://qdrant:6333
+      - UPLOAD_DIR=/app/uploads
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - DATA_ENCRYPTION_KEY=${DATA_ENCRYPTION_KEY:?Set a base64-encoded 32-byte key}
+    volumes:
+      # Share the uploads directory so FastAPI can read PDFs by file_path
+      - uploads:/app/uploads
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ml-service:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    env_file:
+      - backend/.env
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - ML_SERVICE_URL=http://ml-service:8000
+      - UPLOAD_DIR=/app/uploads
+      - QUEUE_ENABLED=true
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - DATA_ENCRYPTION_KEY=${DATA_ENCRYPTION_KEY:?Set a base64-encoded 32-byte key}
+    volumes:
+      - uploads:/app/uploads
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:3001/api/v1
+
+volumes:
+  postgres_data:
+  postgres_test_data:
+  qdrant_storage:
+  uploads:
+  redis_data:

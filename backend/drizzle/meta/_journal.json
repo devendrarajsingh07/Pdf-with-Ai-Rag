@@ -1,0 +1,34 @@
+{
+  "version": "5",
+  "dialect": "pg",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1791133376831,
+      "tag": "0000_unusual_vulture",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1791402567928,
+      "tag": "0001_redundant_pestilence",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1791403298108,
+      "tag": "0002_equal_giant_girl",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1791404142224,
+      "tag": "0003_watery_arclight",
+      "breakpoints": true
+    }
+  ]
+}
